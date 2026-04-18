@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smakelijk & Afiyet olsun</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
+        :root {
+            --warm-terracotta: #d66853;
+            --warm-sand: #f9f1e7;
+            --warm-cream: #fffaf5;
+            --warm-dark: #4d4440;
+        }
+        body { font-family: 'Quicksand', sans-serif; background-color: var(--warm-sand); color: var(--warm-dark); }
+        .bg-primary { background-color: var(--warm-terracotta); }
+        .tab-btn.active { border-bottom: 3px solid var(--warm-terracotta); color: var(--warm-terracotta); font-weight: 700; }
+        .hidden { display: none; }
+        @media print { .no-print { display: none !important; } .day-card { page-break-inside: avoid; border: 1px solid #ddd !important; } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-7xl mx-auto">
+        <header class="text-center mb-10 no-print">
+            <h1 class="text-4xl font-bold text-[#d66853] mb-2">🍴 Smakelijk & Afiyet olsun</h1>
+            <p class="text-gray-500 italic">Uw gezinsplanner</p>
+        </header>
+
+        <nav class="flex justify-center space-x-8 mb-8 border-b border-orange-200 no-print">
+            <button onclick="switchTab('planner')" id="tab-planner" class="tab-btn px-4 py-3 active">Weekplanning</button>
+            <button onclick="switchTab('recipes')" id="tab-recipes" class="tab-btn px-4 py-3">Gerechtenboek</button>
+            <button onclick="switchTab('shopping')" id="tab-shopping" class="tab-btn px-4 py-3">Boodschappen</button>
+        </nav>
+
+        <div id="section-planner">
+            <div class="flex justify-center mb-8 gap-3 no-print">
+                <button onclick="changeWeek(-1)" class="px-6 py-2 border-2 border-[#d66853] rounded-full text-[#d66853] font-bold">Vorige</button>
+                <button onclick="changeWeek(0)" class="px-6 py-2 border-2 border-[#d66853] bg-[#d66853] text-white rounded-full font-bold">Deze week</button>
+                <button onclick="changeWeek(1)" class="px-6 py-2 border-2 border-[#d66853] rounded-full text-[#d66853] font-bold">Volgende</button>
+            </div>
+            <div class="bg-white p-6 rounded-3xl shadow-lg border border-orange-100">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 id="currentWeekTitle" class="text-2xl font-bold">Maaltijdplan</h2>
+                    <button onclick="window.print()" class="no-print bg-[#7d8e7a] text-white px-5 py-2 rounded-xl font-bold">Print / PDF</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-7 gap-4" id="weekGrid"></div>
+            </div>
+        </div>
+
+        <div id="section-recipes" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <div class="p-6 bg-[#fffaf5] rounded-2xl border border-orange-100 h-fit">
+                    <h2 class="text-xl font-bold mb-4 text-[#d66853]">Nieuw Gerecht</h2>
+                    <input id="dishName" type="text" placeholder="Naam..." class="w-full p-3 mb-4 border rounded-xl outline-none">
+                    <select id="dishCategory" class="w-full p-3 mb-4 border rounded-xl bg-white outline-none">
+                        <option value="Ontbijt">🌅 Ontbijt</option>
+                        <option value="Lunch">🥪 Lunch</option>
+                        <option value="Diner">🍲 Diner</option>
+                    </select>
+                    <button onclick="addDish()" class="w-full bg-[#d66853] text-white font-bold py-3 rounded-xl">Toevoegen</button>
+                </div>
+                <div id="fullDishGrid" class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+
+        <div id="section-shopping" class="hidden">
+            <div class="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-lg border border-orange-100">
+                <h2 class="text-3xl font-bold mb-8 text-[#d66853]">🛒 Boodschappen</h2>
+                <ul id="autoShoppingList" class="space-y-3 mb-8"></ul>
+                <div class="border-t pt-8">
+                    <div class="flex gap-2 mb-6 no-print">
+                        <input id="extraItem" type="text" placeholder="Extra item..." class="flex-1 p-3 border rounded-xl outline-none">
+                        <button onclick="addExtraItem()" class="bg-[#7d8e7a] text-white px-6 py-3 rounded-xl font-bold">+</button>
+                    </div>
+                    <ul id="extraShoppingList" class="space-y-3"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const KEY = 'afiyet_v12';
+        let dishes = JSON.parse(localStorage.getItem(KEY + '_d')) || [{id:1, name:'Menemen', category:'Ontbijt'}];
+        let plans = JSON.parse(localStorage.getItem(KEY + '_p')) || {"0":{}};
+        let extras = JSON.parse(localStorage.getItem(KEY + '_e')) || [];
+        let currentWeek = 0;
+
+        function save() {
+            localStorage.setItem(KEY + '_d', JSON.stringify(dishes));
+            localStorage.setItem(KEY + '_p', JSON.stringify(plans));
+            localStorage.setItem(KEY + '_e', JSON.stringify(extras));
+        }
+
+        function switchTab(tab) {
+            ['planner', 'recipes', 'shopping'].forEach(t => {
+                document.getElementById('section-' + t).classList.toggle('hidden', t !== tab);
+                document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+            });
+            if(tab === 'shopping') renderShopping();
+        }
+
+        function changeWeek(w) { currentWeek = w; updateUI(); }
+
+        function updateUI() {
+            const grid = document.getElementById('weekGrid');
+            grid.innerHTML = '';
+            const days = ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag'];
+            days.forEach(day => {
+                let html = `<div class="bg-[#d66853] text-white text-center py-2 text-xs font-bold uppercase">${day}</div>`;
+                ['Ontbijt','Lunch','Diner'].forEach(cat => {
+                    const saved = (plans[currentWeek] || {})[day + '-' + cat] || '';
+                    const opts = dishes.filter(d => d.category === cat).map(d => `<option value="${d.name}" ${saved === d.name ? 'selected' : ''}>${d.name}</option>`).join('');
+                    html += `<div class="p-3 border-b border-orange-50 last:border-0">
+                        <span class="text-[9px] uppercase font-bold text-orange-300 block">${cat}</span>
+                        <select onchange="savePlan(this.value, '${day}', '${cat}')" class="w-full bg-transparent text-xs font-bold outline-none"><option value="">--</option>${opts}</select>
+                        <div class="text-[10px] text-[#d66853] font-bold truncate">${saved}</div>
+                    </div>`;
+                });
+                grid.innerHTML += `<div class="bg-[#fffaf5] border border-orange-100 rounded-xl overflow-hidden">${html}</div>`;
+            });
+        }
+
+        window.savePlan = (v, d, c) => {
+            if(!plans[currentWeek]) plans[currentWeek] = {};
+            v === "" ? delete plans[currentWeek][d+'-'+c] : plans[currentWeek][d+'-'+c] = v;
+            save(); updateUI();
+        };
+
+        window.addDish = () => {
+            const n = document.getElementById('dishName').value;
+            const c = document.getElementById('dishCategory').value;
+            if(n) { dishes.push({id:Date.now(), name:n, category:c}); save(); renderDishes(); updateUI(); document.getElementById('dishName').value=''; }
+        };
+
+        function renderDishes() {
+            document.getElementById('fullDishGrid').innerHTML = dishes.map(d => `<div class="p-4 bg-white border rounded-xl flex justify-between"><span>${d.name}</span><button onclick="delDish(${d.id})" class="text-red-300">×</button></div>`).join('');
+        }
+
+        window.delDish = (id) => { dishes = dishes.filter(d => d.id !== id); save(); renderDishes(); updateUI(); };
+
+        function renderShopping() {
+            const currentPlan = plans[currentWeek] || {};
+            const meals = [...new Set(Object.values(currentPlan))].filter(Boolean);
+            document.getElementById('autoShoppingList').innerHTML = meals.map(m => `<li class="p-3 bg-[#fffaf5] border rounded-xl font-bold">☐ ${m}</li>`).join('');
+            document.getElementById('extraShoppingList').innerHTML = extras.map((e, i) => `<li class="p-3 bg-orange-50 rounded-xl flex justify-between"><span>☐ ${e}</span><button onclick="delExtra(${i})">×</button></li>`).join('');
+        }
+
+        window.addExtraItem = () => { const i = document.getElementById('extraItem'); if(i.value) { extras.push(i.value); i.value=''; save(); renderShopping(); } };
+        window.delExtra = (i) => { extras.splice(i, 1); save(); renderShopping(); };
+
+        window.onload = () => { updateUI(); renderDishes(); };
+    </script>
+</body>
+</html>
