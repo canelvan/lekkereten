@@ -15,10 +15,10 @@
         }
         body { font-family: 'Quicksand', sans-serif; background-color: var(--warm-sand); color: var(--warm-dark); }
         .bg-primary { background-color: var(--warm-terracotta); }
-        .tab-btn { border-bottom: 3px solid transparent; transition: all 0.3s; color: #9ca3af; }
+        .tab-btn { border-bottom: 3px solid transparent; transition: all 0.3s; color: #9ca3af; font-weight: 600; }
         .tab-btn.active { border-bottom: 3px solid var(--warm-terracotta); color: var(--warm-terracotta); font-weight: 700; }
         
-        .week-btn { transition: all 0.2s; border: 2px solid var(--warm-terracotta); color: var(--warm-terracotta); }
+        .week-btn { transition: all 0.2s; border: 2px solid var(--warm-terracotta); color: var(--warm-terracotta); border-radius: 999px; font-weight: 700; padding: 0.5rem 1.5rem; }
         .week-btn.active-week { background-color: var(--warm-terracotta); color: white; }
         
         .hidden { display: none; }
@@ -39,9 +39,9 @@
 
         <div id="section-planner">
             <div class="flex justify-center mb-8 gap-3 no-print">
-                <button onclick="changeWeek(-1)" id="btn-prev" class="week-btn px-6 py-2 rounded-full font-bold">Vorige</button>
-                <button onclick="changeWeek(0)" id="btn-current" class="week-btn px-6 py-2 rounded-full font-bold active-week">Deze week</button>
-                <button onclick="changeWeek(1)" id="btn-next" class="week-btn px-6 py-2 rounded-full font-bold">Volgende</button>
+                <button onclick="changeWeek(-1)" id="btn-prev" class="week-btn">Vorige</button>
+                <button onclick="changeWeek(0)" id="btn-current" class="week-btn active-week">Deze week</button>
+                <button onclick="changeWeek(1)" id="btn-next" class="week-btn">Volgende</button>
             </div>
             <div class="bg-white p-6 rounded-3xl shadow-lg border border-orange-100">
                 <div class="flex justify-between items-center mb-8">
@@ -63,7 +63,7 @@
                         <option value="Diner">🍲 Diner</option>
                         <option value="Tussendoortje">🍎 Tussendoortje</option>
                     </select>
-                    <button onclick="addDish()" class="w-full bg-[#d66853] text-white font-bold py-3 rounded-xl">Toevoegen</button>
+                    <button onclick="addDish()" class="w-full bg-[#d66853] text-white font-bold py-3 rounded-xl shadow-md">Toevoegen</button>
                 </div>
                 <div id="fullDishGrid" class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
             </div>
@@ -77,4 +77,105 @@
                     <button onclick="addExtraItem()" class="bg-[#7d8e7a] text-white px-6 py-3 rounded-xl font-bold">+</button>
                 </div>
                 <ul id="extraShoppingList" class="space-y-3"></ul>
-                <button onclick="clearShopping()" class="mt-8 text-xs text-red-400
+                <button onclick="clearShopping()" class="mt-8 text-xs text-red-400 uppercase font-bold no-print">Lijst volledig wissen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const KEY = 'afiyet_v14_final';
+        let dishes = JSON.parse(localStorage.getItem(KEY + '_d')) || [{id:1, name:'Menemen', category:'Ontbijt'}];
+        let plans = JSON.parse(localStorage.getItem(KEY + '_p')) || {"-1":{}, "0":{}, "1":{}};
+        let extras = JSON.parse(localStorage.getItem(KEY + '_e')) || [];
+        let currentWeek = 0;
+
+        const CATEGORIES = ['Ontbijt','Lunch','Diner','Tussendoortje'];
+
+        function save() {
+            localStorage.setItem(KEY + '_d', JSON.stringify(dishes));
+            localStorage.setItem(KEY + '_p', JSON.stringify(plans));
+            localStorage.setItem(KEY + '_e', JSON.stringify(extras));
+        }
+
+        function switchTab(tab) {
+            ['planner', 'recipes', 'shopping'].forEach(t => {
+                document.getElementById('section-' + t).classList.toggle('hidden', t !== tab);
+                document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+            });
+            if(tab === 'shopping') renderShopping();
+        }
+
+        function changeWeek(w) { 
+            currentWeek = w; 
+            // Update knoppen visueel
+            document.getElementById('btn-prev').classList.toggle('active-week', w === -1);
+            document.getElementById('btn-current').classList.toggle('active-week', w === 0);
+            document.getElementById('btn-next').classList.toggle('active-week', w === 1);
+            updateUI(); 
+        }
+
+        function updateUI() {
+            const grid = document.getElementById('weekGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            const days = ['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag'];
+            
+            days.forEach(day => {
+                let html = `<div class="bg-[#d66853] text-white text-center py-2 text-xs font-bold uppercase tracking-widest">${day}</div>`;
+                CATEGORIES.forEach(cat => {
+                    const saved = (plans[currentWeek] || {})[day + '-' + cat] || '';
+                    const opts = dishes.filter(d => d.category === cat).map(d => `<option value="${d.name}" ${saved === d.name ? 'selected' : ''}>${d.name}</option>`).join('');
+                    html += `<div class="p-2 border-b border-orange-50 last:border-0 hover:bg-orange-50/50">
+                        <span class="text-[8px] uppercase font-bold text-orange-300 block">${cat}</span>
+                        <select onchange="savePlan(this.value, '${day}', '${cat}')" class="w-full bg-transparent text-xs font-bold outline-none cursor-pointer"><option value="">--</option>${opts}</select>
+                        <div class="text-[10px] text-[#d66853] font-bold truncate h-3">${saved}</div>
+                    </div>`;
+                });
+                grid.innerHTML += `<div class="bg-[#fffaf5] border border-orange-100 rounded-xl overflow-hidden shadow-sm">${html}</div>`;
+            });
+            const titles = { "-1": "Vorige week", "0": "Deze week", "1": "Volgende week" };
+            document.getElementById('currentWeekTitle').innerText = titles[currentWeek];
+        }
+
+        window.savePlan = (v, d, c) => {
+            if(!plans[currentWeek]) plans[currentWeek] = {};
+            v === "" ? delete plans[currentWeek][d+'-'+c] : plans[currentWeek][d+'-'+c] = v;
+            save(); updateUI();
+        };
+
+        window.addDish = () => {
+            const n = document.getElementById('dishName').value;
+            const c = document.getElementById('dishCategory').value;
+            if(n) { dishes.push({id:Date.now(), name:n, category:c}); save(); renderDishes(); updateUI(); document.getElementById('dishName').value=''; }
+        };
+
+        function renderDishes() {
+            const grid = document.getElementById('fullDishGrid');
+            if (!grid) return;
+            grid.innerHTML = dishes.map(d => `
+                <div class="p-4 bg-white border border-orange-100 rounded-xl flex justify-between items-center shadow-sm">
+                    <div><span class="text-[9px] uppercase font-bold text-orange-300">${d.category}</span><h3 class="font-bold text-gray-800">${d.name}</h3></div>
+                    <button onclick="delDish(${d.id})" class="text-red-200 hover:text-red-500 font-bold text-xl px-2">×</button>
+                </div>`).join('');
+        }
+
+        window.delDish = (id) => { if(confirm('Gerecht verwijderen?')) { dishes = dishes.filter(d => d.id !== id); save(); renderDishes(); updateUI(); } };
+
+        function renderShopping() {
+            const list = document.getElementById('extraShoppingList');
+            if (!list) return;
+            list.innerHTML = extras.map((e, i) => `
+                <li class="p-3 bg-[#fffaf5] border border-orange-100 rounded-xl flex justify-between items-center shadow-sm">
+                    <div class="flex items-center gap-3"><input type="checkbox" class="w-5 h-5 accent-[#7d8e7a]"> <span class="font-bold text-gray-700">${e}</span></div>
+                    <button onclick="delExtra(${i})" class="text-red-300 font-bold text-xl px-2">×</button>
+                </li>`).join('');
+        }
+
+        window.addExtraItem = () => { const i = document.getElementById('extraItem'); if(i.value) { extras.push(i.value); i.value=''; save(); renderShopping(); } };
+        window.delExtra = (i) => { extras.splice(i, 1); save(); renderShopping(); };
+        window.clearShopping = () => { if(confirm('Hele lijst wissen?')) { extras = []; save(); renderShopping(); } };
+
+        window.onload = () => { updateUI(); renderDishes(); };
+    </script>
+</body>
+</html>
